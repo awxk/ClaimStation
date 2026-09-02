@@ -61,6 +61,7 @@ Headed Chrome is recommended for PSDeals discovery because Cloudflare may block 
 ## What It Does
 
 - Discovers free games, bundles, and DLC from PSDeals by default.
+- Optionally expands discovery to PlayStation Plus Extra and Premium catalog pages.
 - Optionally scans PlayStation official discovery pages and legacy PlatPrices sources.
 - Resolves PSDeals detail pages once and stores those results in a local discovery cache.
 - Opens the PlayStation Store product page for every candidate before acting.
@@ -135,6 +136,8 @@ npm run cli -- redeem [flags]
 | `--url <url>` | URL | Legacy PlatPrices page URL. |
 | `--psdeals-url <url>` | URL | PSDeals listing URL. Defaults to the all-free games/bundles/DLC URL. |
 | `--psdeals-collections` | Boolean | Also scan the curated PSDeals collection pages for PS Plus and Free To Play lists. The default run uses the broad all-free listing only. |
+| `--extra` | Boolean | Also scan the PSDeals PlayStation Plus Game Catalog collection. Store verification still decides whether each item is redeemable. |
+| `--premium` | Boolean | Also scan the Extra catalog and the PSDeals PlayStation Plus Classics Catalog collection. Store verification still decides whether each item is redeemable. |
 | `--refresh-psdeals-cache` | Boolean | Reopen PSDeals detail pages even if their resolved Store URLs are already cached. |
 | `--discover-url <url...>` | One or more URLs | Extra PlayStation official discovery pages to scan. |
 | `--file <path>` | File path | Read Store URLs from a text file instead of discovery. |
@@ -164,6 +167,8 @@ npm run cli -- discover [flags]
 | `--url <url...>` | One or more URLs | Custom PlayStation official discovery pages. |
 | `--psdeals-url <url>` | URL | PSDeals listing URL. Defaults to the all-free games/bundles/DLC URL. |
 | `--psdeals-collections` | Boolean | Also scan curated PSDeals PS Plus and Free To Play collection pages. |
+| `--extra` | Boolean | Also scan the PSDeals PlayStation Plus Game Catalog collection. |
+| `--premium` | Boolean | Also scan Extra plus the PSDeals PlayStation Plus Classics Catalog collection. |
 | `--refresh-psdeals-cache` | Boolean | Refresh PSDeals detail-resolution cache entries. |
 | `--debug` | Boolean | Emit/save additional diagnostics. |
 | `--headless` | Boolean | Run without a visible browser. Not recommended for PSDeals discovery. |
@@ -280,6 +285,22 @@ npm run cli -- redeem --source psdeals --all --psdeals-collections
 ```
 
 Adds PSDeals collection pages for PS Plus and Free To Play lists. The broad all-free listing remains the primary source.
+
+### PSDeals Plus Extra Catalog
+
+```sh
+npm run cli -- redeem --source psdeals --all --extra
+```
+
+Adds the PSDeals PlayStation Plus Game Catalog collection to the normal all-free listing. PSDeals catalog prices may not look free, so each product is checked on the live PlayStation Store before redemption.
+
+### PSDeals Plus Premium Catalog
+
+```sh
+npm run cli -- redeem --source psdeals --all --premium
+```
+
+Adds the normal all-free listing, the Extra Game Catalog, and the Premium Classics Catalog. Premium implies Extra.
 
 ### Refresh PSDeals Detail Resolution
 
@@ -439,6 +460,7 @@ https://psdeals.net/us-store/all-games?sort=recently-added&contentType%5B%5D=gam
 
 - PSDeals is used only for discovery. PlayStation Store verification decides whether an item is actually redeemable.
 - PS Plus items are redeemable only when the signed-in account sees an actionable zero-dollar `Add to Cart` or `Add to Library` state.
+- `--extra` and `--premium` intentionally include PSDeals catalog pages whose listing prices may not be zero. The Store product page remains the safety gate.
 - PlatPrices code remains in the project as an unused-by-default fallback.
 
 ## Disclaimer

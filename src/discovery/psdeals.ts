@@ -7,12 +7,24 @@ import { resolveCandidateFromDiscoveryUrl } from "./playstation.js";
 export const defaultPsDealsFreeUrl =
   "https://psdeals.net/us-store/all-games?sort=recently-added&contentType%5B%5D=games&contentType%5B%5D=bundles&contentType%5B%5D=dlc&maxPrice=0";
 
+export const psDealsFreeWithPlusCollectionUrl = "https://psdeals.net/us-store/collection/free_with_ps_plus";
+export const psDealsExtraCatalogUrl = "https://psdeals.net/us-store/collection/ps_plus_game_catalog";
+export const psDealsPremiumClassicCatalogUrl = "https://psdeals.net/us-store/collection/ps_plus_classic_game_collection";
+export const psDealsFreeToPlayCollectionUrl = "https://psdeals.net/us-store/collection/free_to_play";
+
 export const psDealsCollectionUrls = [
-  "https://psdeals.net/us-store/collection/free_with_ps_plus",
-  "https://psdeals.net/us-store/collection/ps_plus_game_catalog",
-  "https://psdeals.net/us-store/collection/ps_plus_classic_game_collection",
-  "https://psdeals.net/us-store/collection/free_to_play",
+  psDealsFreeWithPlusCollectionUrl,
+  psDealsExtraCatalogUrl,
+  psDealsPremiumClassicCatalogUrl,
+  psDealsFreeToPlayCollectionUrl,
 ];
+
+export type PsDealsSearchUrlOptions = {
+  searchUrl?: string;
+  includeCollections?: boolean;
+  includeExtra?: boolean;
+  includePremium?: boolean;
+};
 
 export type PsDealsDiscoveryOptions = {
   searchUrl?: string;
@@ -39,6 +51,14 @@ type PsDealsDiscoveryCache = Record<string, PsDealsDiscoveryCacheEntry>;
 type PsDealsResolveResult =
   | { status: "resolved"; candidate: Candidate }
   | { status: "excluded" | "trial" | "unresolved"; reason: string; candidate?: Candidate };
+
+export function psDealsSearchUrlsForOptions(options: PsDealsSearchUrlOptions = {}): string[] {
+  const urls = [options.searchUrl ?? defaultPsDealsFreeUrl];
+  if (options.includeCollections) urls.push(...psDealsCollectionUrls);
+  if (options.includeExtra || options.includePremium) urls.push(psDealsExtraCatalogUrl);
+  if (options.includePremium) urls.push(psDealsPremiumClassicCatalogUrl);
+  return [...new Set(urls)];
+}
 
 export async function discoverCandidatesFromPsDeals(page: Page, options: PsDealsDiscoveryOptions = {}): Promise<Candidate[]> {
   const candidates: Candidate[] = [];

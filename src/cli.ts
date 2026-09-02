@@ -11,7 +11,7 @@ import {
   fetchFreeCandidatesFromPlatPrices,
   scrapeFreeCandidatesFromPlatPricesPage,
 } from "./discovery/platprices.js";
-import { defaultPsDealsFreeUrl, psDealsCollectionUrls, streamCandidatesFromPsDeals } from "./discovery/psdeals.js";
+import { defaultPsDealsFreeUrl, psDealsSearchUrlsForOptions, streamCandidatesFromPsDeals } from "./discovery/psdeals.js";
 import {
   discoverCandidatesFromPlayStation,
   resolveCandidateFromDiscoveryUrl,
@@ -40,9 +40,18 @@ type PendingCartItem = {
 
 type CandidateIterable = Iterable<Candidate> | AsyncIterable<Candidate>;
 
-function psDealsUrlsForOptions(options: { psdealsUrl: string; psdealsCollections?: boolean }): string[] {
-  if (options.psdealsUrl !== defaultPsDealsFreeUrl) return [options.psdealsUrl];
-  return options.psdealsCollections ? [defaultPsDealsFreeUrl, ...psDealsCollectionUrls] : [defaultPsDealsFreeUrl];
+function psDealsUrlsForCliOptions(options: {
+  psdealsUrl: string;
+  psdealsCollections?: boolean;
+  extra?: boolean;
+  premium?: boolean;
+}): string[] {
+  return psDealsSearchUrlsForOptions({
+    searchUrl: options.psdealsUrl,
+    includeCollections: options.psdealsCollections,
+    includeExtra: options.extra,
+    includePremium: options.premium,
+  });
 }
 
 async function* concatCandidateIterables(...iterables: CandidateIterable[]): AsyncGenerator<Candidate> {
@@ -504,6 +513,8 @@ program
   .option("--url <url...>", "custom official PlayStation page URL(s) to extract Store links from")
   .option("--psdeals-url <url>", "PSDeals zero-price search URL", defaultPsDealsFreeUrl)
   .option("--psdeals-collections", "also scan PSDeals PS+ and free-to-play collection pages", false)
+  .option("--extra", "also scan the PSDeals PlayStation Plus Game Catalog collection", false)
+  .option("--premium", "also scan Extra plus the PSDeals PlayStation Plus Classics Catalog collection", false)
   .option("--refresh-psdeals-cache", "ignore cached PSDeals detail resolutions and refresh them", false)
   .option("--debug", "print discovery diagnostics", false)
   .option("--headless", "run browser headlessly", false)
@@ -517,6 +528,8 @@ program
       url?: string[];
       psdealsUrl: string;
       psdealsCollections: boolean;
+      extra: boolean;
+      premium: boolean;
       refreshPsdealsCache: boolean;
       debug: boolean;
       headless: boolean;
@@ -529,7 +542,7 @@ program
         const candidates: CandidateIterable =
           options.source === "psdeals" || options.source === "psdeals-page"
             ? streamCandidatesFromPsDeals(session.page, {
-                searchUrls: psDealsUrlsForOptions(options),
+                searchUrls: psDealsUrlsForCliOptions(options),
                 cookieHeader: app.psDealsCookie,
                 discoveryCachePath: app.psDealsDiscoveryCachePath,
                 refreshDiscoveryCache: options.refreshPsdealsCache,
@@ -547,7 +560,7 @@ program
                     debug: options.debug,
                   }),
                   streamCandidatesFromPsDeals(session.page, {
-                    searchUrls: psDealsUrlsForOptions(options),
+                    searchUrls: psDealsUrlsForCliOptions(options),
                     cookieHeader: app.psDealsCookie,
                     discoveryCachePath: app.psDealsDiscoveryCachePath,
                     refreshDiscoveryCache: options.refreshPsdealsCache,
@@ -632,6 +645,8 @@ program
   .option("--url <url>", "PlatPrices search URL for page scraping", defaultPlatPricesFreeUrl)
   .option("--psdeals-url <url>", "PSDeals zero-price search URL", defaultPsDealsFreeUrl)
   .option("--psdeals-collections", "also scan PSDeals PS+ and free-to-play collection pages", false)
+  .option("--extra", "also scan the PSDeals PlayStation Plus Game Catalog collection", false)
+  .option("--premium", "also scan Extra plus the PSDeals PlayStation Plus Classics Catalog collection", false)
   .option("--refresh-psdeals-cache", "ignore cached PSDeals detail resolutions and refresh them", false)
   .option("--discover-url <url...>", "custom official PlayStation page URL(s) for PlayStation discovery")
   .option("--file <path>", "text file containing Store or PlatPrices URLs")
@@ -651,6 +666,8 @@ program
     url: string;
     psdealsUrl: string;
     psdealsCollections: boolean;
+    extra: boolean;
+    premium: boolean;
     refreshPsdealsCache: boolean;
     discoverUrl?: string[];
     file?: string;
@@ -689,7 +706,7 @@ program
         });
       } else if (source === "psdeals-page" || source === "psdeals") {
         candidates = streamCandidatesFromPsDeals(session.page, {
-          searchUrls: psDealsUrlsForOptions(options),
+          searchUrls: psDealsUrlsForCliOptions(options),
           cookieHeader: app.psDealsCookie,
           discoveryCachePath: app.psDealsDiscoveryCachePath,
           refreshDiscoveryCache: options.refreshPsdealsCache,
@@ -707,7 +724,7 @@ program
             debug: options.debug,
           }),
           streamCandidatesFromPsDeals(session.page, {
-            searchUrls: psDealsUrlsForOptions(options),
+            searchUrls: psDealsUrlsForCliOptions(options),
             cookieHeader: app.psDealsCookie,
             discoveryCachePath: app.psDealsDiscoveryCachePath,
             refreshDiscoveryCache: options.refreshPsdealsCache,
