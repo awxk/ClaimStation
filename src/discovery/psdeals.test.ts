@@ -26,6 +26,8 @@ describe("PSDeals search URL selection", () => {
 
   it("recognizes human-check pages", () => {
     expect(isPsDealsHumanCheckText("Are you human? Complete the CAPTCHA to continue.")).toBe(true);
+    expect(isPsDealsHumanCheckText("Verify your browser. Complete this quick check to continue to PS Deals.")).toBe(true);
+    expect(isPsDealsHumanCheckText("Verification is temporarily unavailable. Please try again later.")).toBe(true);
     expect(isPsDealsHumanCheckText("Checking if the site connection is secure")).toBe(true);
     expect(isPsDealsHumanCheckText("Reviewing the security of your connection")).toBe(true);
     expect(isPsDealsHumanCheckText('<script src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>')).toBe(true);

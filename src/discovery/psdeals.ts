@@ -215,7 +215,7 @@ function isExcludedFreeListing(text: string): boolean {
 }
 
 export function isPsDealsHumanCheckText(text: string): boolean {
-  return /\b(are you human|captcha|checking if the site connection is secure|checking your browser|just a moment|one more step|prove you are human|human verification|verify (?:that )?you are human|reviewing the security of your connection|cf-browser-verification|challenge-platform|challenges\.cloudflare\.com|turnstile|cf-chl|ray id)\b/i.test(text);
+  return /\b(are you human|verify your browser|complete this quick check|verification is temporarily unavailable|captcha|checking if the site connection is secure|checking your browser|just a moment|one more step|prove you are human|human verification|verify (?:that )?you are human|reviewing the security of your connection|cf-browser-verification|challenge-platform|challenges\.cloudflare\.com|turnstile|cf-chl|ray id)\b/i.test(text);
 }
 
 function isPsDealsHardBlockText(text: string): boolean {
@@ -311,13 +311,28 @@ async function extractPsDealsListingLinks(page: Page, includeAllCollectionLinks:
 }
 
 async function readPsDealsChallengeProbe(page: Page): Promise<string> {
-  const [body, title, html, url] = await Promise.all([
+  const [body, title, domMarkers, url] = await Promise.all([
     page.locator("body").innerText({ timeout: 5_000 }).catch(() => ""),
     page.title().catch(() => ""),
-    page.content().catch(() => ""),
+    page
+      .evaluate(() =>
+        [
+          document.querySelector("#cf-browser-verification, .cf-browser-verification, .challenge-platform, [class*='turnstile'], [id*='turnstile']")
+            ? "challenge element"
+            : "",
+          [...document.querySelectorAll<HTMLScriptElement>("script[src]")]
+            .map((script) => script.src)
+            .filter((src) => /challenges\.cloudflare\.com|turnstile|captcha|cf-chl/i.test(src))
+            .join("\n"),
+          location.pathname === "/human-check" ? "psdeals human-check page" : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      )
+      .catch(() => ""),
     Promise.resolve(page.url()),
   ]);
-  return `${url}\n${title}\n${body}\n${html.slice(0, 50_000)}`;
+  return `${url}\n${title}\n${body}\n${domMarkers}`;
 }
 
 function isClearlyExhaustedPsDealsPage(text: string): boolean {
