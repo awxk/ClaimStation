@@ -54,6 +54,10 @@ function psDealsUrlsForCliOptions(options: {
   });
 }
 
+function usesPsDealsSource(source: string): boolean {
+  return source === "psdeals" || source === "psdeals-page" || source === "all" || source === "auto" || source === "page";
+}
+
 async function* concatCandidateIterables(...iterables: CandidateIterable[]): AsyncGenerator<Candidate> {
   const seen = new Set<string>();
   for (const iterable of iterables) {
@@ -550,7 +554,9 @@ program
       headless: boolean;
     }) => {
       const app = readConfig();
-      const session = await openBrowserSession(app.userDataDir, options.headless);
+      const session = await openBrowserSession(app.userDataDir, options.headless, {
+        blockHeavyResources: !usesPsDealsSource(options.source),
+      });
       try {
         const limit = options.all ? Number.MAX_SAFE_INTEGER : Number(options.limit);
         const pages = options.pages ? Number(options.pages) : null;

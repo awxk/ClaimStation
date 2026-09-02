@@ -15,13 +15,17 @@ export type BrowserSession = {
   close: () => Promise<void>;
 };
 
+export type BrowserSessionOptions = {
+  blockHeavyResources?: boolean;
+};
+
 const challengeResourcePattern = /(?:challenges\.cloudflare\.com|captcha|hcaptcha|recaptcha|turnstile|cf-chl|challenge-platform)/i;
 const firstPartyResourcePattern = /(?:playstation\.com|playstation\.net|sonyentertainmentnetwork\.com|cloudflare\.com)/i;
 const analyticsResourcePattern =
   /(?:google-analytics|googletagmanager|doubleclick|facebook\.com\/tr|hotjar|segment|amplitude|mixpanel|newrelic|datadog|optimizely|clarity\.ms|bat\.bing\.com|cloudflareinsights\.com)/i;
 const psDealsResourcePattern = /psdeals\.net\b/i;
 
-export async function openBrowserSession(userDataDir: string, headless = false): Promise<BrowserSession> {
+export async function openBrowserSession(userDataDir: string, headless = false, options: BrowserSessionOptions = {}): Promise<BrowserSession> {
   await mkdir(userDataDir, { recursive: true });
   const lockPath = join(userDataDir, ".ps-free-redeem.lock");
   await clearStaleLock(lockPath);
@@ -66,7 +70,7 @@ export async function openBrowserSession(userDataDir: string, headless = false):
       browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
       context = browser.contexts()[0] ?? (await browser.newContext());
     }
-    await installLeanResourceBlocking(context);
+    if (options.blockHeavyResources !== false) await installLeanResourceBlocking(context);
   } catch (error) {
     await lock.close();
     await rm(lockPath, { force: true });
