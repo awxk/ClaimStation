@@ -13,10 +13,10 @@ export type BrowserSession = {
 };
 
 const challengeResourcePattern = /(?:challenges\.cloudflare\.com|captcha|hcaptcha|recaptcha|turnstile|cf-chl|challenge-platform)/i;
-const firstPartyResourcePattern = /(?:playstation\.com|playstation\.net|sonyentertainmentnetwork\.com|psdeals\.net|cloudflare\.com)/i;
+const firstPartyResourcePattern = /(?:playstation\.com|playstation\.net|sonyentertainmentnetwork\.com|cloudflare\.com)/i;
 const analyticsResourcePattern =
   /(?:google-analytics|googletagmanager|doubleclick|facebook\.com\/tr|hotjar|segment|amplitude|mixpanel|newrelic|datadog|optimizely|clarity\.ms|bat\.bing\.com|cloudflareinsights\.com)/i;
-const psDealsHumanCheckPattern = /psdeals\.net\/human-check\b/i;
+const psDealsResourcePattern = /psdeals\.net\b/i;
 
 export async function openBrowserSession(userDataDir: string, headless = false): Promise<BrowserSession> {
   await mkdir(userDataDir, { recursive: true });
@@ -89,7 +89,7 @@ export async function openBrowserSession(userDataDir: string, headless = false):
 }
 
 export function shouldBlockBrowserRequest(resourceType: string, url: string, pageUrl = "", referer = ""): boolean {
-  if (psDealsHumanCheckPattern.test(`${url}\n${pageUrl}\n${referer}`)) return false;
+  if (psDealsResourcePattern.test(`${url}\n${pageUrl}\n${referer}`)) return false;
   if (challengeResourcePattern.test(url)) return false;
   if (resourceType === "image" || resourceType === "media" || resourceType === "font") return true;
   if (firstPartyResourcePattern.test(url) && !analyticsResourcePattern.test(url)) return false;

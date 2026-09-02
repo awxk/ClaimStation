@@ -15,7 +15,9 @@ describe("lean browser resource blocking", () => {
     expect(shouldBlockBrowserRequest("script", "https://challenges.cloudflare.com/turnstile/v0/api.js")).toBe(false);
   });
 
-  it("does not slim PSDeals human-check pages", () => {
+  it("does not slim PSDeals pages", () => {
+    expect(shouldBlockBrowserRequest("image", "https://psdeals.net/cover.png")).toBe(false);
+    expect(shouldBlockBrowserRequest("image", "https://cdn.example.com/cover.jpg", "https://psdeals.net/us-store/all-games")).toBe(false);
     expect(shouldBlockBrowserRequest("image", "https://psdeals.net/logo.png", "https://psdeals.net/human-check?ticket=abc")).toBe(false);
     expect(shouldBlockBrowserRequest("font", "https://cdn.example.com/font.woff2", "", "https://psdeals.net/human-check?ticket=abc")).toBe(false);
   });
