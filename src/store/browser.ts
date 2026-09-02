@@ -16,6 +16,7 @@ const challengeResourcePattern = /(?:challenges\.cloudflare\.com|captcha|hcaptch
 const firstPartyResourcePattern = /(?:playstation\.com|playstation\.net|sonyentertainmentnetwork\.com|psdeals\.net|cloudflare\.com)/i;
 const analyticsResourcePattern =
   /(?:google-analytics|googletagmanager|doubleclick|facebook\.com\/tr|hotjar|segment|amplitude|mixpanel|newrelic|datadog|optimizely|clarity\.ms|bat\.bing\.com|cloudflareinsights\.com)/i;
+const psDealsHumanCheckPattern = /psdeals\.net\/human-check\b/i;
 
 export async function openBrowserSession(userDataDir: string, headless = false): Promise<BrowserSession> {
   await mkdir(userDataDir, { recursive: true });
@@ -87,7 +88,8 @@ export async function openBrowserSession(userDataDir: string, headless = false):
   };
 }
 
-export function shouldBlockBrowserRequest(resourceType: string, url: string): boolean {
+export function shouldBlockBrowserRequest(resourceType: string, url: string, pageUrl = "", referer = ""): boolean {
+  if (psDealsHumanCheckPattern.test(`${url}\n${pageUrl}\n${referer}`)) return false;
   if (challengeResourcePattern.test(url)) return false;
   if (resourceType === "image" || resourceType === "media" || resourceType === "font") return true;
   if (firstPartyResourcePattern.test(url) && !analyticsResourcePattern.test(url)) return false;
@@ -99,7 +101,7 @@ async function installLeanResourceBlocking(context: BrowserContext): Promise<voi
 
   await context.route("**/*", async (route) => {
     const request = route.request();
-    if (shouldBlockBrowserRequest(request.resourceType(), request.url())) {
+    if (shouldBlockBrowserRequest(request.resourceType(), request.url(), request.frame().url(), request.headers().referer)) {
       await route.abort().catch(() => undefined);
       return;
     }

@@ -15,6 +15,11 @@ describe("lean browser resource blocking", () => {
     expect(shouldBlockBrowserRequest("script", "https://challenges.cloudflare.com/turnstile/v0/api.js")).toBe(false);
   });
 
+  it("does not slim PSDeals human-check pages", () => {
+    expect(shouldBlockBrowserRequest("image", "https://psdeals.net/logo.png", "https://psdeals.net/human-check?ticket=abc")).toBe(false);
+    expect(shouldBlockBrowserRequest("font", "https://cdn.example.com/font.woff2", "", "https://psdeals.net/human-check?ticket=abc")).toBe(false);
+  });
+
   it("blocks common analytics and tracking requests", () => {
     expect(shouldBlockBrowserRequest("script", "https://www.googletagmanager.com/gtm.js?id=GTM-123")).toBe(true);
     expect(shouldBlockBrowserRequest("xhr", "https://www.google-analytics.com/g/collect")).toBe(true);
