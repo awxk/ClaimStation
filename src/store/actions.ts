@@ -73,19 +73,44 @@ async function clickPrimaryCta(page: Page, label: "Add to Library" | "Add to Car
     return true;
   }
 
+  const loosePrimaryButton = page.locator('[data-qa="mfeCtaMain#cta#action"]').filter({ hasText: new RegExp(escapeRegex(label), "i") }).first();
+  if (await loosePrimaryButton.isVisible().catch(() => false)) {
+    await loosePrimaryButton.click();
+    return true;
+  }
+
   const accessibleButton = page.getByRole("button", { name: exactText }).first();
   if (await accessibleButton.isVisible().catch(() => false)) {
     await accessibleButton.click();
     return true;
   }
 
+  const accessibleLink = page.getByRole("link", { name: exactText }).first();
+  if (await accessibleLink.isVisible().catch(() => false)) {
+    await accessibleLink.click();
+    return true;
+  }
+
+  const ctaText = page.locator('[data-qa="mfeCtaMain#cta"]').getByText(exactText).first();
+  if (await ctaText.isVisible().catch(() => false)) {
+    await ctaText.click();
+    return true;
+  }
+
   return await page.evaluate(
     `((buttonLabel) => {
       const normalize = (value) => value ? value.replace(/\\s+/g, " ").trim() : "";
-      const candidates = Array.from(document.querySelectorAll('[data-qa="mfeCtaMain#cta#action"], button, [role="button"]'));
-      const button = candidates.find((element) => normalize(element.textContent).toLowerCase() === buttonLabel.toLowerCase());
+      const candidates = Array.from(document.querySelectorAll('[data-qa="mfeCtaMain#cta#action"], [data-qa="mfeCtaMain#cta"] a, [data-qa="mfeCtaMain#cta"] button, button, a, [role="button"]'));
+      const button = candidates.find((element) => {
+        const text = normalize(element.textContent);
+        if (!text.toLowerCase().includes(buttonLabel.toLowerCase())) return false;
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      });
       if (!button) return false;
-      button.click();
+      if (button instanceof HTMLElement) button.click();
+      else button.dispatchEvent(new Event("click", { bubbles: true }));
       return true;
     })`,
     label,

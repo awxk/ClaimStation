@@ -23,7 +23,7 @@ import { readCache, shouldAttemptCandidate, updateCacheEntry, writeCache } from 
 import { assertSafeCart, productIdFromStoreUrl, SafetyError } from "./safety.js";
 import { clickSafePrimaryAction } from "./store/actions.js";
 import { findChromePath, openBrowserSession } from "./store/browser.js";
-import { confirmFreeCart, openCart, readCartState, removeNonFreeCartItems } from "./store/cart.js";
+import { confirmFreeCart, isCartFrameUnavailableError, openCart, readCartState, removeNonFreeCartItems } from "./store/cart.js";
 import { readPrimaryCtaState } from "./store/product-page.js";
 import type { Candidate } from "./types.js";
 
@@ -175,6 +175,21 @@ async function checkoutPendingCart(
     console.log(`confirmed free cart for ${pendingCartItems.length} item(s)`);
     pendingCartItems.length = 0;
   } catch (error) {
+    if (isCartFrameUnavailableError(error)) {
+      await appendAuditEvent(options.auditLog, {
+        type: "cart-state",
+        result: "checkout-deferred-cart-frame-unavailable",
+        details: {
+          pendingCartItems,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+      await writeCache(options.cachePath, options.cache);
+      if (options.finalSweep) {
+        console.log(`cart checkout deferred: cart frame was not readable for ${pendingCartItems.length} pending item(s)`);
+        return;
+      }
+    }
     for (const item of pendingCartItems) {
       updateCacheEntry(options.cache, item, "error", { error });
       await appendAuditEvent(options.auditLog, {

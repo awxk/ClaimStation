@@ -28,6 +28,7 @@ function parseCartLines(text: string): CartLine[] {
 }
 
 export async function openCart(page: Page): Promise<boolean> {
+  if (await page.locator('iframe[name="embeddedcart"]').first().isVisible({ timeout: 750 }).catch(() => false)) return true;
   const button = page
     .locator('[data-qa="web-toolbar#profile-container#cart#show"], button[aria-label*="cart" i]')
     .first()
@@ -38,13 +39,14 @@ export async function openCart(page: Page): Promise<boolean> {
       if (element instanceof HTMLElement) element.click();
     });
   });
+  await page.locator('iframe[name="embeddedcart"]').first().waitFor({ state: "attached", timeout: 15_000 }).catch(() => undefined);
   await page.waitForTimeout(1_000);
   return true;
 }
 
 export async function readCartState(page: Page): Promise<CartState> {
   const frame = checkoutFrame(page);
-  const text = await frame.locator("body").innerText({ timeout: 10_000 });
+  const text = await frame.locator("body").innerText({ timeout: 20_000 });
   const totalMatch = text.match(/Total \([^)]*\)\s*\n?(\$\d[\d,.]*|Free|\$0\.00)/i);
   const totalText = totalMatch?.[1] ?? null;
   const canConfirm = await frame.getByRole("button", { name: /Confirm Purchase/i }).first().isEnabled().catch(() => false);
@@ -57,6 +59,11 @@ export async function readCartState(page: Page): Promise<CartState> {
     canConfirm,
     evidence: [text.slice(0, 1_500)],
   };
+}
+
+export function isCartFrameUnavailableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /iframe\[name="embeddedcart"\]|contentFrame\(\)\.locator\('body'\)|waiting for locator/i.test(message);
 }
 
 export async function removeNonFreeCartItems(page: Page): Promise<number> {
