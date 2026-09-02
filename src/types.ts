@@ -41,6 +41,11 @@ export type ProductCtaState = {
   rawActionType: string | null;
   ineligibilityReasons: string[];
   evidence: string[];
+  selectableOffer?: {
+    label: string;
+    value: string | null;
+    actionType: string | null;
+  };
 };
 
 export type CartLine = {

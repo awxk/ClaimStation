@@ -25,6 +25,13 @@ type EmbeddedProduct = {
   activeCtaId?: string;
 };
 
+type SelectableOffer = {
+  label: string;
+  value: string | null;
+  actionType: string | null;
+  checked: boolean;
+};
+
 function actionFromRaw(
   raw: string | null,
   ctaType: string | null,
@@ -32,12 +39,19 @@ function actionFromRaw(
   visiblePrimaryCta: string,
   isFree: boolean,
   priceText: string | null,
+  selectableOffer: SelectableOffer | null,
 ): ProductCtaAction {
   const combinedEvidence = `${visiblePrimaryCta}\n${textEvidence}`;
   const trialEvidence = `${raw ?? ""}\n${ctaType ?? ""}\n${priceText ?? ""}\n${visiblePrimaryCta}`;
   if (/\bSign In\b/i.test(visiblePrimaryCta) || /\nSign In\n/i.test(textEvidence)) return "blocked";
   if (/This probably isn't what you're looking for|unavailable|not available/i.test(combinedEvidence)) return "unavailable";
   if (/\b(Game Trial|Trial)\b/i.test(trialEvidence) || /PS_PLUS_TRIAL|DOWNLOAD_TRIAL/i.test(trialEvidence)) return "trial";
+  if (selectableOffer && /\bFree\b/i.test(selectableOffer.label) && /BACKGROUND_PURCHASE_AND_DOWNLOAD|ADD_TO_LIBRARY/i.test(selectableOffer.actionType ?? "")) {
+    return "add-to-library";
+  }
+  if (selectableOffer && /\bFree\b/i.test(selectableOffer.label) && /ADD_TO_CART/i.test(selectableOffer.actionType ?? "")) {
+    return "add-to-cart";
+  }
   if (/\b(Owned|Purchased)\b|Download from Library/i.test(combinedEvidence)) return "owned";
   if (isFree && /Add to Library/i.test(visiblePrimaryCta)) return "add-to-library";
   if (isFree && /(Add to Cart|In Cart)/i.test(visiblePrimaryCta)) return "add-to-cart";
@@ -58,6 +72,27 @@ export async function readPrimaryCtaState(page: Page, productId: string): Promis
         .map((el) => el.textContent?.replace(/\s+/g, " ").trim() ?? "")
         .filter(Boolean)
         .join("\n") || "";
+    const selectableOffers = [...document.querySelectorAll<HTMLElement>('[data-qa^="mfeCtaMain#offer"]')]
+      .filter((el) => /^mfeCtaMain#offer\d+$/.test(el.getAttribute("data-qa") ?? ""))
+      .map((el) => {
+        const input = el.querySelector<HTMLInputElement>('input[name="activeCta"][type="radio"]');
+        const label = el.textContent?.replace(/\s+/g, " ").trim() ?? "";
+        const value = input?.value ?? null;
+        return {
+          label,
+          value,
+          actionType: value?.split(":")[1] ?? null,
+          checked: input?.checked ?? false,
+        };
+      })
+      .filter((offer) => offer.label);
+    const selectableOffer =
+      selectableOffers.find(
+        (offer) =>
+          !offer.checked &&
+          /\bFree\b/i.test(offer.label) &&
+          /BACKGROUND_PURCHASE_AND_DOWNLOAD|ADD_TO_LIBRARY|ADD_TO_CART/i.test(offer.actionType ?? ""),
+      ) ?? null;
     const markers = ["\nEditions:", "\nAdd-Ons", "\nRatings and reviews", "\nGame and Legal Info"];
     let end = text.length;
     for (const marker of markers) {
@@ -75,13 +110,13 @@ export async function readPrimaryCtaState(page: Page, productId: string): Promis
         const product = cache?.[`Product:${id}`] as EmbeddedProduct | undefined;
         const ctaId = product?.activeCtaId;
         const cta = ctaId ? (cache?.[`GameCTA:${ctaId}`] as EmbeddedCta | undefined) : undefined;
-        if (product && cta) return { segment, visiblePrimaryCta, product, cta, ctaId };
+        if (product && cta) return { segment, visiblePrimaryCta, selectableOffer, product, cta, ctaId };
       } catch {
         continue;
       }
     }
 
-    return { segment, visiblePrimaryCta, product: null, cta: null, ctaId: null };
+    return { segment, visiblePrimaryCta, selectableOffer, product: null, cta: null, ctaId: null };
   }, productId);
 
   const rawActionType = embedded.cta?.action?.type ?? embedded.cta?.type ?? null;
@@ -92,6 +127,7 @@ export async function readPrimaryCtaState(page: Page, productId: string): Promis
   const evidence = [
     `primary segment: ${embedded.segment.slice(0, 500)}`,
     `visiblePrimaryCta: ${embedded.visiblePrimaryCta || "none"}`,
+    `selectableOffer: ${embedded.selectableOffer ? `${embedded.selectableOffer.label} (${embedded.selectableOffer.actionType ?? "unknown"})` : "none"}`,
     `ctaId: ${embedded.ctaId ?? "none"}`,
     `rawActionType: ${rawActionType ?? "none"}`,
   ];
@@ -107,6 +143,7 @@ export async function readPrimaryCtaState(page: Page, productId: string): Promis
       embedded.visiblePrimaryCta,
       price.isFree && price.minorUnits === 0,
       price.formatted,
+      embedded.selectableOffer,
     ),
     skuId,
     rewardId,
@@ -115,5 +152,6 @@ export async function readPrimaryCtaState(page: Page, productId: string): Promis
     rawActionType,
     ineligibilityReasons: embedded.cta?.meta?.ineligibilityReasons ?? [],
     evidence,
+    selectableOffer: embedded.selectableOffer ?? undefined,
   };
 }

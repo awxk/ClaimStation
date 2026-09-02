@@ -12,14 +12,14 @@ export async function clickSafePrimaryAction(
   const validateCartAfterAdd = options.validateCartAfterAdd ?? true;
 
   if (state.action === "add-to-library") {
-    if (!(await clickPrimaryCta(page, "Add to Library"))) {
+    if (!(await clickPrimaryCta(page, "Add to Library")) && !(await selectFreeRedeemableOfferAndClick(page, "Add to Library"))) {
       throw new SafetyError("Primary CTA says add-to-library, but no visible primary button was found", state);
     }
     await page.waitForTimeout(5_000);
     return "added-to-library";
   }
 
-  if (!(await clickPrimaryCta(page, "Add to Cart"))) {
+  if (!(await clickPrimaryCta(page, "Add to Cart")) && !(await selectFreeRedeemableOfferAndClick(page, "Add to Cart"))) {
     const inCart = page.locator('[data-qa="mfeCtaMain#cta#action"]').filter({ hasText: /^In Cart$/i }).first();
     if (!(await inCart.isVisible().catch(() => false))) {
       throw new SafetyError("Primary CTA says add-to-cart, but no visible primary button was found", state);
@@ -45,6 +45,24 @@ export async function clickSafePrimaryAction(
     }
   }
   return "added-to-cart";
+}
+
+async function selectFreeRedeemableOfferAndClick(page: Page, label: "Add to Library" | "Add to Cart"): Promise<boolean> {
+  const actionFragments = label === "Add to Cart" ? ["ADD_TO_CART"] : ["BACKGROUND_PURCHASE_AND_DOWNLOAD", "ADD_TO_LIBRARY"];
+  let selected = false;
+  for (const actionFragment of actionFragments) {
+    const offer = page
+      .locator(`[data-qa^="mfeCtaMain#offer"]:has(input[name="activeCta"][type="radio"][value*="${actionFragment}"])`)
+      .filter({ hasText: /\bFree\b/i })
+      .first();
+    if (!(await offer.isVisible().catch(() => false))) continue;
+    await offer.click({ timeout: 5_000 });
+    selected = true;
+    break;
+  }
+  if (!selected) return false;
+  await page.waitForTimeout(1_500);
+  return clickPrimaryCta(page, label);
 }
 
 async function clickPrimaryCta(page: Page, label: "Add to Library" | "Add to Cart"): Promise<boolean> {
