@@ -222,6 +222,10 @@ function isPsDealsHardBlockText(text: string): boolean {
   return /\b(Sorry, you have been blocked|Attention Required)\b/i.test(text);
 }
 
+export function isPsDealsVerificationUnavailableText(text: string): boolean {
+  return /\bVerification is temporarily unavailable\b/i.test(text);
+}
+
 async function waitForPsDealsAccess(
   page: Page,
   url: string,
@@ -230,6 +234,11 @@ async function waitForPsDealsAccess(
   const firstText = await readPsDealsChallengeProbe(page);
   if (isPsDealsHardBlockText(firstText)) {
     throw new Error(`PSDeals blocked browser access at ${url}`);
+  }
+  if (isPsDealsVerificationUnavailableText(firstText)) {
+    throw new Error(
+      `PSDeals verification is temporarily unavailable at ${url}. Run \`npm run psdeals:unlock\`, solve PSDeals in the plain Chrome window, close it, then retry this command.`,
+    );
   }
   if (!isPsDealsHumanCheckText(firstText)) return;
   if (options.headless) {
@@ -244,6 +253,11 @@ async function waitForPsDealsAccess(
     const text = await readPsDealsChallengeProbe(page);
     if (isPsDealsHardBlockText(text)) {
       throw new Error(`PSDeals blocked browser access at ${url}`);
+    }
+    if (isPsDealsVerificationUnavailableText(text)) {
+      throw new Error(
+        `PSDeals verification is temporarily unavailable at ${url}. Run \`npm run psdeals:unlock\`, solve PSDeals in the plain Chrome window, close it, then retry this command.`,
+      );
     }
     if (!isPsDealsHumanCheckText(text)) {
       if (options.debug) console.error("PSDeals human check cleared; resuming discovery.");

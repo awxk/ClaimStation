@@ -5,6 +5,7 @@ import {
   psDealsPremiumClassicCatalogUrl,
   psDealsSearchUrlsForOptions,
   isPsDealsHumanCheckText,
+  isPsDealsVerificationUnavailableText,
 } from "./psdeals.js";
 
 describe("PSDeals search URL selection", () => {
@@ -33,5 +34,10 @@ describe("PSDeals search URL selection", () => {
     expect(isPsDealsHumanCheckText('<script src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>')).toBe(true);
     expect(isPsDealsHumanCheckText('<div id="cf-browser-verification" class="challenge-platform"></div>')).toBe(true);
     expect(isPsDealsHumanCheckText("We found 1800 results")).toBe(false);
+  });
+
+  it("recognizes temporarily unavailable verification", () => {
+    expect(isPsDealsVerificationUnavailableText("Verification is temporarily unavailable. Please try again later.")).toBe(true);
+    expect(isPsDealsVerificationUnavailableText("Verify your browser")).toBe(false);
   });
 });
