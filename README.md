@@ -35,6 +35,7 @@ PLAYSTATION_EMAIL=
 PLAYSTATION_PASSWORD=
 PSDEALS_COOKIE=
 PSDEALS_USER_AGENT=
+PSDEALS_HUMAN_CHECK_TIMEOUT_MS=300000
 PS_REDEEM_CHROME_PATH=
 PS_REDEEM_USER_DATA_DIR=.ps-free-redeem/chrome-profile
 PS_REDEEM_CACHE=.ps-free-redeem/cache.json
@@ -56,7 +57,7 @@ If PSDeals blocks automation, refresh the local PSDeals browser/cookie state:
 npm run psdeals:unlock
 ```
 
-Headed Chrome is recommended for PSDeals discovery because Cloudflare may block headless sessions.
+Headed Chrome is recommended for PSDeals discovery because Cloudflare may block headless sessions. If PSDeals presents a human check in a headed run, ClaimStation waits for it to be solved in the opened Chrome window before continuing. Adjust `PSDEALS_HUMAN_CHECK_TIMEOUT_MS` if you need more or less than the default five minutes.
 
 ## What It Does
 

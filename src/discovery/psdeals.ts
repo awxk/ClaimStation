@@ -32,6 +32,8 @@ export type PsDealsDiscoveryOptions = {
   cookieHeader?: string | null;
   discoveryCachePath?: string;
   refreshDiscoveryCache?: boolean;
+  humanCheckTimeoutMs?: number;
+  headless?: boolean;
   pages?: number | null;
   limit?: number;
   debug?: boolean;
@@ -86,11 +88,7 @@ export async function* streamCandidatesFromPsDeals(
       const listingUrl = pageNumber === 1 ? searchUrl : setPathPage(searchUrl, pageNumber);
       await page.goto(listingUrl, { waitUntil: "domcontentloaded", timeout: 45_000 });
       await page.waitForTimeout(2_000);
-
-      const blocked = await page.locator("body").innerText({ timeout: 5_000 }).catch(() => "");
-      if (/Cloudflare|Sorry, you have been blocked|Attention Required/i.test(blocked)) {
-        throw new Error(`PSDeals blocked browser access at ${listingUrl}`);
-      }
+      await waitForPsDealsAccess(page, listingUrl, options);
 
       const includeAllCollectionLinks = /\/collection\/(?:free_with_ps_plus|ps_plus_game_catalog|ps_plus_classic_game_collection|free_to_play)\b/i.test(
         listingUrl,
@@ -165,6 +163,7 @@ async function resolveCandidateFromPsDealsPage(
 ): Promise<PsDealsResolveResult> {
   await page.goto(psDealsUrl, { waitUntil: "domcontentloaded", timeout: 45_000 });
   await page.waitForTimeout(1_000);
+  await waitForPsDealsAccess(page, psDealsUrl, { debug });
   const pageData = await page.evaluate(() => {
     const titleFromDocument = document.title.replace(/\s+(?:PS[45].*|--?.*|—.*|\|.*)$/, "").trim();
     const title =
@@ -221,6 +220,47 @@ function setPathPage(rawUrl: string, pageNumber: number): string {
 
 function isExcludedFreeListing(text: string): boolean {
   return /\b(Game Trial|Timed Trial|Trial|Demo|Beta)\b/i.test(text);
+}
+
+export function isPsDealsHumanCheckText(text: string): boolean {
+  return /\b(are you human|verify you are human|captcha|checking if the site connection is secure|just a moment)\b/i.test(text);
+}
+
+function isPsDealsHardBlockText(text: string): boolean {
+  return /\b(Sorry, you have been blocked|Attention Required)\b/i.test(text);
+}
+
+async function waitForPsDealsAccess(
+  page: Page,
+  url: string,
+  options: Pick<PsDealsDiscoveryOptions, "debug" | "headless" | "humanCheckTimeoutMs">,
+): Promise<void> {
+  const firstText = await page.locator("body").innerText({ timeout: 5_000 }).catch(() => "");
+  if (isPsDealsHardBlockText(firstText)) {
+    throw new Error(`PSDeals blocked browser access at ${url}`);
+  }
+  if (!isPsDealsHumanCheckText(firstText)) return;
+  if (options.headless) {
+    throw new Error(`PSDeals human check is required at ${url}; rerun without --headless so it can be solved.`);
+  }
+
+  const timeoutMs = options.humanCheckTimeoutMs ?? 300_000;
+  const deadline = Date.now() + timeoutMs;
+  console.error(`PSDeals human check detected at ${url}. Solve it in the opened Chrome window; waiting up to ${Math.round(timeoutMs / 1000)} seconds.`);
+  while (Date.now() < deadline) {
+    await page.waitForTimeout(2_000);
+    const text = await page.locator("body").innerText({ timeout: 5_000 }).catch(() => "");
+    if (isPsDealsHardBlockText(text)) {
+      throw new Error(`PSDeals blocked browser access at ${url}`);
+    }
+    if (!isPsDealsHumanCheckText(text)) {
+      if (options.debug) console.error("PSDeals human check cleared; resuming discovery.");
+      await page.waitForTimeout(1_000);
+      return;
+    }
+  }
+
+  throw new Error(`Timed out waiting for PSDeals human check at ${url}`);
 }
 
 async function readPsDealsDiscoveryCache(path: string): Promise<PsDealsDiscoveryCache> {

@@ -10,6 +10,7 @@ export type AppConfig = {
   playStationEmail: string | null;
   playStationPassword: string | null;
   psDealsCookie: string | null;
+  psDealsHumanCheckTimeoutMs: number;
   psDealsUserAgent: string | null;
   region: string;
   userDataDir: string;
@@ -24,6 +25,7 @@ export function readConfig(): AppConfig {
     playStationEmail: process.env.PLAYSTATION_EMAIL || null,
     playStationPassword: process.env.PLAYSTATION_PASSWORD || null,
     psDealsCookie: process.env.PSDEALS_COOKIE || null,
+    psDealsHumanCheckTimeoutMs: Number(process.env.PSDEALS_HUMAN_CHECK_TIMEOUT_MS || 300_000),
     psDealsUserAgent: process.env.PSDEALS_USER_AGENT || null,
     region: process.env.PS_REDEEM_REGION || "us",
     userDataDir: process.env.PS_REDEEM_USER_DATA_DIR || ".ps-free-redeem/chrome-profile",

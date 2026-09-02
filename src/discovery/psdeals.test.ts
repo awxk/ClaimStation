@@ -4,6 +4,7 @@ import {
   psDealsExtraCatalogUrl,
   psDealsPremiumClassicCatalogUrl,
   psDealsSearchUrlsForOptions,
+  isPsDealsHumanCheckText,
 } from "./psdeals.js";
 
 describe("PSDeals search URL selection", () => {
@@ -21,5 +22,11 @@ describe("PSDeals search URL selection", () => {
       psDealsExtraCatalogUrl,
       psDealsPremiumClassicCatalogUrl,
     ]);
+  });
+
+  it("recognizes human-check pages", () => {
+    expect(isPsDealsHumanCheckText("Are you human? Complete the CAPTCHA to continue.")).toBe(true);
+    expect(isPsDealsHumanCheckText("Checking if the site connection is secure")).toBe(true);
+    expect(isPsDealsHumanCheckText("We found 1800 results")).toBe(false);
   });
 });
