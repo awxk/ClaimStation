@@ -2,8 +2,11 @@ import { mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { platform } from "node:os";
 import { resolve, join } from "node:path";
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
+import { promisify } from "node:util";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+
+const execFileAsync = promisify(execFile);
 
 export type BrowserSession = {
   browser?: Browser;
@@ -42,6 +45,7 @@ export async function openBrowserSession(userDataDir: string, headless = false):
         viewport: null,
       });
     } else {
+      await assertChromeProfileNotAlreadyOpen(userDataDir);
       const chromePath = findChromePath();
       const port = await findAvailablePort();
       const userAgent = process.env.PS_REDEEM_USER_AGENT || process.env.PSDEALS_USER_AGENT;
@@ -86,6 +90,23 @@ export async function openBrowserSession(userDataDir: string, headless = false):
       await rm(lockPath, { force: true });
     },
   };
+}
+
+async function assertChromeProfileNotAlreadyOpen(userDataDir: string): Promise<void> {
+  if (platform() !== "win32") return;
+  const profilePath = resolve(userDataDir).toLowerCase();
+  const script = [
+    "$profile = $args[0].ToLowerInvariant()",
+    "Get-CimInstance Win32_Process -Filter \"Name = 'chrome.exe'\" |",
+    "  Where-Object { $_.CommandLine -and $_.CommandLine.ToLowerInvariant().Contains($profile) } |",
+    "  Select-Object -First 1 -ExpandProperty ProcessId",
+  ].join("\n");
+  const { stdout } = await execFileAsync("powershell.exe", ["-NoProfile", "-Command", script, profilePath]).catch(() => ({ stdout: "" }));
+  const pid = stdout.trim();
+  if (!pid) return;
+  throw new Error(
+    `Chrome profile is already open for ${resolve(userDataDir)} by process ${pid}. Close that ClaimStation/PSDeals Chrome window, then rerun the command.`,
+  );
 }
 
 export function shouldBlockBrowserRequest(resourceType: string, url: string, pageUrl = "", referer = ""): boolean {
