@@ -1,0 +1,29 @@
+{
+  "name": "claimstation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "check": "npm run build && npm run test",
+    "cli": "tsx src/cli.ts",
+    "auth:native": "tsx src/cli.ts native-auth",
+    "psdeals:unlock": "tsx src/cli.ts psdeals-unlock",
+    "redeem:psdeals": "tsx src/cli.ts redeem --source psdeals --all",
+    "discover:ps-plus-packs": "tsx src/cli.ts discover --kind ps-plus-exclusive-packs --all",
+    "redeem:ps-plus-packs": "tsx src/cli.ts redeem --source playstation --kind ps-plus-exclusive-packs --all"
+  },
+  "dependencies": {
+    "commander": "^14.0.0",
+    "dotenv": "^17.2.1",
+    "playwright": "^1.54.2",
+    "zod": "^4.0.17"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.4",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
