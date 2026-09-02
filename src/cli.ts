@@ -11,7 +11,7 @@ import {
   fetchFreeCandidatesFromPlatPrices,
   scrapeFreeCandidatesFromPlatPricesPage,
 } from "./discovery/platprices.js";
-import { defaultPsDealsFreeUrl, psDealsSearchUrlsForOptions, streamCandidatesFromPsDeals } from "./discovery/psdeals.js";
+import { defaultPsDealsFreeUrl, PsDealsHumanCheckError, psDealsSearchUrlsForOptions, streamCandidatesFromPsDeals } from "./discovery/psdeals.js";
 import {
   discoverCandidatesFromPlayStation,
   resolveCandidateFromDiscoveryUrl,
@@ -562,6 +562,7 @@ program
                 discoveryCachePath: app.psDealsDiscoveryCachePath,
                 refreshDiscoveryCache: options.refreshPsdealsCache,
                 humanCheckTimeoutMs: app.psDealsHumanCheckTimeoutMs,
+                pageDelayMs: app.psDealsPageDelayMs,
                 headless: options.headless,
                 limit,
                 pages,
@@ -582,6 +583,7 @@ program
                     discoveryCachePath: app.psDealsDiscoveryCachePath,
                     refreshDiscoveryCache: options.refreshPsdealsCache,
                     humanCheckTimeoutMs: app.psDealsHumanCheckTimeoutMs,
+                    pageDelayMs: app.psDealsPageDelayMs,
                     headless: options.headless,
                     limit,
                     pages,
@@ -705,6 +707,7 @@ program
     const session = await openBrowserSession(app.userDataDir, options.headless);
     const cache = await readCache(app.cachePath);
     const pendingCartItems: PendingCartItem[] = [];
+    let keepBrowserOpen = false;
 
     try {
       await session.page.goto("https://store.playstation.com/en-us/pages/latest", { waitUntil: "domcontentloaded" });
@@ -730,6 +733,7 @@ program
           discoveryCachePath: app.psDealsDiscoveryCachePath,
           refreshDiscoveryCache: options.refreshPsdealsCache,
           humanCheckTimeoutMs: app.psDealsHumanCheckTimeoutMs,
+          pageDelayMs: app.psDealsPageDelayMs,
           headless: options.headless,
           pages: options.pages ? Number(options.pages) : null,
           limit: options.all ? Number.MAX_SAFE_INTEGER : Number(options.limit),
@@ -750,6 +754,7 @@ program
             discoveryCachePath: app.psDealsDiscoveryCachePath,
             refreshDiscoveryCache: options.refreshPsdealsCache,
             humanCheckTimeoutMs: app.psDealsHumanCheckTimeoutMs,
+            pageDelayMs: app.psDealsPageDelayMs,
             headless: options.headless,
             pages: options.pages ? Number(options.pages) : null,
             limit: options.all ? Number.MAX_SAFE_INTEGER : Number(options.limit),
@@ -924,10 +929,14 @@ program
           details: error.details,
         });
       }
+      if (error instanceof PsDealsHumanCheckError && !options.headless) {
+        keepBrowserOpen = true;
+        console.error("Leaving the Chrome window open so you can inspect or solve the PSDeals verification page. Close it when finished.");
+      }
       throw error;
     } finally {
       await writeCache(app.cachePath, cache);
-      await session.close();
+      if (!keepBrowserOpen) await session.close();
     }
   });
 

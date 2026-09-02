@@ -33,6 +33,7 @@ export type PsDealsDiscoveryOptions = {
   discoveryCachePath?: string;
   refreshDiscoveryCache?: boolean;
   humanCheckTimeoutMs?: number;
+  pageDelayMs?: number;
   headless?: boolean;
   pages?: number | null;
   limit?: number;
@@ -53,6 +54,13 @@ type PsDealsDiscoveryCache = Record<string, PsDealsDiscoveryCacheEntry>;
 type PsDealsResolveResult =
   | { status: "resolved"; candidate: Candidate }
   | { status: "excluded" | "trial" | "unresolved"; reason: string; candidate?: Candidate };
+
+export class PsDealsHumanCheckError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PsDealsHumanCheckError";
+  }
+}
 
 export function psDealsSearchUrlsForOptions(options: PsDealsSearchUrlOptions = {}): string[] {
   const urls = [options.searchUrl ?? defaultPsDealsFreeUrl];
@@ -143,6 +151,7 @@ export async function* streamCandidatesFromPsDeals(
         if (yielded >= limit) return;
       }
 
+      await waitForPsDealsPagePace(options.pageDelayMs, options.debug);
       if (newLinks === 0 || yielded >= limit) break;
     }
   }
@@ -250,16 +259,16 @@ async function waitForPsDealsAccess(
     throw new Error(`PSDeals blocked browser access at ${url}`);
   }
   if (isPsDealsVerificationUnavailableText(firstText)) {
-    throw new Error(
+    throw new PsDealsHumanCheckError(
       `PSDeals verification is temporarily unavailable at ${url}. Run \`npm run psdeals:unlock\`, solve PSDeals in the plain Chrome window, close it, then retry this command.`,
     );
   }
   if (!isPsDealsHumanCheckText(firstText)) return;
   if (options.headless) {
-    throw new Error(`PSDeals human check is required at ${url}; rerun without --headless so it can be solved.`);
+    throw new PsDealsHumanCheckError(`PSDeals human check is required at ${url}; rerun without --headless so it can be solved.`);
   }
 
-  throw new Error(
+  throw new PsDealsHumanCheckError(
     `PSDeals human check is required at ${url}. Run \`npm run psdeals:unlock\`, solve PSDeals in the plain Chrome window, close it, then retry this command.`,
   );
 }
@@ -466,6 +475,15 @@ async function seedPsDealsCookies(page: Page, cookieHeader: string | null | unde
   }));
   if (cookies.length === 0) return;
   await page.context().addCookies(cookies);
+}
+
+async function waitForPsDealsPagePace(pageDelayMs: number | undefined, debug: boolean | undefined): Promise<void> {
+  const baseDelayMs = Math.max(0, pageDelayMs ?? 0);
+  if (baseDelayMs === 0) return;
+  const jitterMs = Math.round(baseDelayMs * (0.35 + Math.random() * 0.4));
+  const delayMs = baseDelayMs + jitterMs;
+  if (debug) console.error(`PSDeals pacing delay: ${delayMs}ms`);
+  await new Promise((resolveWait) => setTimeout(resolveWait, delayMs));
 }
 
 function parseCookieHeader(cookieHeader: string): Array<{ name: string; value: string }> {

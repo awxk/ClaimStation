@@ -36,6 +36,7 @@ PLAYSTATION_PASSWORD=
 PSDEALS_COOKIE=
 PSDEALS_USER_AGENT=
 PSDEALS_HUMAN_CHECK_TIMEOUT_MS=300000
+PSDEALS_PAGE_DELAY_MS=4000
 PS_REDEEM_CHROME_PATH=
 PS_REDEEM_USER_DATA_DIR=.ps-free-redeem/chrome-profile
 PS_REDEEM_CACHE=.ps-free-redeem/cache.json
@@ -58,7 +59,7 @@ If PSDeals blocks automation, refresh the local PSDeals browser/cookie state:
 npm run psdeals:unlock
 ```
 
-Headed Chrome is recommended for PSDeals discovery because Cloudflare may block headless sessions. If PSDeals presents a human check in a headed run, ClaimStation waits for it to be solved in the opened Chrome window before continuing. If PSDeals says verification is temporarily unavailable, run `npm run psdeals:unlock`, solve PSDeals in that plain Chrome window, close it, then retry the redeem command. Adjust `PSDEALS_HUMAN_CHECK_TIMEOUT_MS` if you need more or less than the default five minutes.
+Headed Chrome is recommended for PSDeals discovery because Cloudflare may block headless sessions. If PSDeals presents a human check in a headed run, ClaimStation leaves the Chrome window open for inspection instead of closing it immediately. If PSDeals says verification is temporarily unavailable, run `npm run psdeals:unlock`, solve PSDeals in that plain Chrome window, close it, then retry the redeem command. Adjust `PSDEALS_HUMAN_CHECK_TIMEOUT_MS` if you need more or less than the default five minutes, and adjust `PSDEALS_PAGE_DELAY_MS` if PSDeals starts challenging fast pagination.
 
 ## What It Does
 
@@ -465,6 +466,7 @@ https://psdeals.net/us-store/all-games?sort=recently-added&contentType%5B%5D=gam
 - PS Plus items are redeemable only when the signed-in account sees an actionable zero-dollar `Add to Cart` or `Add to Library` state.
 - `--extra` and `--premium` intentionally include PSDeals catalog pages whose listing prices may not be zero. The Store product page remains the safety gate.
 - PlatPrices code remains in the project as an unused-by-default fallback.
+- PSDeals pagination waits between pages by default using `PSDEALS_PAGE_DELAY_MS` plus jitter to reduce repeated verification triggers.
 - Set `PS_REDEEM_BLOCK_HEAVY_RESOURCES=false` if a PlayStation or PSDeals page behaves incorrectly with lean browser loading enabled.
 
 ## Disclaimer
