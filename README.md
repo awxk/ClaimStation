@@ -40,6 +40,7 @@ PS_REDEEM_CHROME_PATH=
 PS_REDEEM_USER_DATA_DIR=.ps-free-redeem/chrome-profile
 PS_REDEEM_CACHE=.ps-free-redeem/cache.json
 PS_REDEEM_AUDIT_LOG=.ps-free-redeem/audit.jsonl
+PS_REDEEM_BLOCK_HEAVY_RESOURCES=true
 PSDEALS_DISCOVERY_CACHE=.ps-free-redeem/psdeals-discovery-cache.json
 PLATPRICES_API_KEY=
 ```
@@ -75,6 +76,7 @@ Headed Chrome is recommended for PSDeals discovery because Cloudflare may block 
 - Skips known trials unless explicitly told to revisit them.
 - Writes an audit trail for discovery, verification, action, checkout, and failures.
 - Avoids download actions entirely.
+- Blocks nonessential browser resources such as images, media, fonts, and common trackers by default to reduce page rendering overhead.
 
 ## State And Logs
 
@@ -463,6 +465,7 @@ https://psdeals.net/us-store/all-games?sort=recently-added&contentType%5B%5D=gam
 - PS Plus items are redeemable only when the signed-in account sees an actionable zero-dollar `Add to Cart` or `Add to Library` state.
 - `--extra` and `--premium` intentionally include PSDeals catalog pages whose listing prices may not be zero. The Store product page remains the safety gate.
 - PlatPrices code remains in the project as an unused-by-default fallback.
+- Set `PS_REDEEM_BLOCK_HEAVY_RESOURCES=false` if a PlayStation or PSDeals page behaves incorrectly with lean browser loading enabled.
 
 ## Disclaimer
 

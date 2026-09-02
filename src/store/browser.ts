@@ -12,6 +12,11 @@ export type BrowserSession = {
   close: () => Promise<void>;
 };
 
+const challengeResourcePattern = /(?:challenges\.cloudflare\.com|captcha|hcaptcha|recaptcha|turnstile|cf-chl|challenge-platform)/i;
+const firstPartyResourcePattern = /(?:playstation\.com|playstation\.net|sonyentertainmentnetwork\.com|psdeals\.net|cloudflare\.com)/i;
+const analyticsResourcePattern =
+  /(?:google-analytics|googletagmanager|doubleclick|facebook\.com\/tr|hotjar|segment|amplitude|mixpanel|newrelic|datadog|optimizely|clarity\.ms|bat\.bing\.com|cloudflareinsights\.com)/i;
+
 export async function openBrowserSession(userDataDir: string, headless = false): Promise<BrowserSession> {
   await mkdir(userDataDir, { recursive: true });
   const lockPath = join(userDataDir, ".ps-free-redeem.lock");
@@ -56,6 +61,7 @@ export async function openBrowserSession(userDataDir: string, headless = false):
       browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
       context = browser.contexts()[0] ?? (await browser.newContext());
     }
+    await installLeanResourceBlocking(context);
   } catch (error) {
     await lock.close();
     await rm(lockPath, { force: true });
@@ -79,6 +85,26 @@ export async function openBrowserSession(userDataDir: string, headless = false):
       await rm(lockPath, { force: true });
     },
   };
+}
+
+export function shouldBlockBrowserRequest(resourceType: string, url: string): boolean {
+  if (challengeResourcePattern.test(url)) return false;
+  if (resourceType === "image" || resourceType === "media" || resourceType === "font") return true;
+  if (firstPartyResourcePattern.test(url) && !analyticsResourcePattern.test(url)) return false;
+  return analyticsResourcePattern.test(url);
+}
+
+async function installLeanResourceBlocking(context: BrowserContext): Promise<void> {
+  if (isDisabled(process.env.PS_REDEEM_BLOCK_HEAVY_RESOURCES)) return;
+
+  await context.route("**/*", async (route) => {
+    const request = route.request();
+    if (shouldBlockBrowserRequest(request.resourceType(), request.url())) {
+      await route.abort().catch(() => undefined);
+      return;
+    }
+    await route.continue().catch(() => undefined);
+  });
 }
 
 export function findChromePath(): string {
@@ -152,4 +178,8 @@ function isProcessAlive(pid: number): boolean {
   } catch {
     return false;
   }
+}
+
+function isDisabled(value: string | undefined): boolean {
+  return /^(?:0|false|no|off)$/i.test(value ?? "");
 }
