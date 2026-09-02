@@ -942,7 +942,11 @@ program
       throw error;
     } finally {
       await writeCache(app.cachePath, cache);
-      if (!keepBrowserOpen) await session.close();
+      if (keepBrowserOpen) {
+        await session.releaseLock();
+      } else {
+        await session.close();
+      }
     }
   });
 

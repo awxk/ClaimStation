@@ -13,6 +13,7 @@ export type BrowserSession = {
   context: BrowserContext;
   page: Page;
   close: () => Promise<void>;
+  releaseLock: () => Promise<void>;
 };
 
 export type BrowserSessionOptions = {
@@ -79,6 +80,10 @@ export async function openBrowserSession(userDataDir: string, headless = false, 
   }
 
   const page = context.pages()[0] ?? (await context.newPage());
+  const releaseLock = async () => {
+    await lock.close().catch(() => undefined);
+    await rm(lockPath, { force: true });
+  };
   return {
     browser: browser ?? undefined,
     context,
@@ -90,9 +95,9 @@ export async function openBrowserSession(userDataDir: string, headless = false, 
         await context?.close().catch(() => undefined);
       }
       chromeProcess?.kill();
-      await lock.close().catch(() => undefined);
-      await rm(lockPath, { force: true });
+      await releaseLock();
     },
+    releaseLock,
   };
 }
 
@@ -126,12 +131,20 @@ async function installLeanResourceBlocking(context: BrowserContext): Promise<voi
 
   await context.route("**/*", async (route) => {
     const request = route.request();
-    if (shouldBlockBrowserRequest(request.resourceType(), request.url(), request.frame().url(), request.headers().referer)) {
+    if (shouldBlockBrowserRequest(request.resourceType(), request.url(), requestFrameUrl(request), request.headers().referer)) {
       await route.abort().catch(() => undefined);
       return;
     }
     await route.continue().catch(() => undefined);
   });
+}
+
+function requestFrameUrl(request: { frame: () => { url: () => string } }): string {
+  try {
+    return request.frame().url();
+  } catch {
+    return "";
+  }
 }
 
 export function findChromePath(): string {
