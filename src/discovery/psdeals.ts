@@ -93,15 +93,7 @@ export async function* streamCandidatesFromPsDeals(
       const includeAllCollectionLinks = /\/collection\/(?:free_with_ps_plus|ps_plus_game_catalog|ps_plus_classic_game_collection|free_to_play)\b/i.test(
         listingUrl,
       );
-      const links = await page.evaluate((includeAll) =>
-        [...document.querySelectorAll<HTMLAnchorElement>('a[href*="/us-store/game/"]')]
-          .map((anchor) => ({
-            url: anchor.href,
-            name: anchor.textContent?.replace(/\s+/g, " ").trim() || anchor.getAttribute("aria-label") || anchor.href,
-          }))
-          .filter((link) => includeAll || /(?:^|[\s-])FREE(?:[\s-]|$)|\b0 USD\b/i.test(link.name)),
-        includeAllCollectionLinks,
-      );
+      const links = await waitForPsDealsListingLinks(page, listingUrl, includeAllCollectionLinks, options, pageNumber);
 
       if (options.debug) console.error(`PSDeals ${listingUrl}: ${links.length} candidate links`);
       let newLinks = 0;
@@ -135,7 +127,7 @@ export async function* streamCandidatesFromPsDeals(
           continue;
         }
 
-        const resolved = await resolveCandidateFromPsDealsPage(page, cleanUrl, options.debug);
+        const resolved = await resolveCandidateFromPsDealsPage(page, cleanUrl, options);
         await updatePsDealsDiscoveryCache(discoveryCachePath, discoveryCache, cleanUrl, {
           psDealsUrl: cleanUrl,
           name: resolved.candidate?.name ?? link.name,
@@ -159,11 +151,11 @@ export async function* streamCandidatesFromPsDeals(
 async function resolveCandidateFromPsDealsPage(
   page: Page,
   psDealsUrl: string,
-  debug: boolean | undefined,
+  options: Pick<PsDealsDiscoveryOptions, "debug" | "headless" | "humanCheckTimeoutMs">,
 ): Promise<PsDealsResolveResult> {
   await page.goto(psDealsUrl, { waitUntil: "domcontentloaded", timeout: 45_000 });
   await page.waitForTimeout(1_000);
-  await waitForPsDealsAccess(page, psDealsUrl, { debug });
+  await waitForPsDealsAccess(page, psDealsUrl, options);
   const pageData = await page.evaluate(() => {
     const titleFromDocument = document.title.replace(/\s+(?:PS[45].*|--?.*|—.*|\|.*)$/, "").trim();
     const title =
@@ -183,11 +175,11 @@ async function resolveCandidateFromPsDealsPage(
   });
 
   if (!pageData.storeUrl) {
-    if (debug) console.error(`PSDeals page has no Store FREE link: ${psDealsUrl}`);
+    if (options.debug) console.error(`PSDeals page has no Store FREE link: ${psDealsUrl}`);
     return { status: "unresolved", reason: "PSDeals detail page had no free PlayStation Store link" };
   }
   if (isExcludedFreeListing(`${pageData.title}\n${pageData.body.slice(0, 600)}`)) {
-    if (debug) console.error(`Skipping excluded PSDeals detail page: ${pageData.title} (${psDealsUrl})`);
+    if (options.debug) console.error(`Skipping excluded PSDeals detail page: ${pageData.title} (${psDealsUrl})`);
     return { status: "excluded", reason: "PSDeals detail page matched excluded free content pattern" };
   }
 
@@ -223,7 +215,7 @@ function isExcludedFreeListing(text: string): boolean {
 }
 
 export function isPsDealsHumanCheckText(text: string): boolean {
-  return /\b(are you human|verify you are human|captcha|checking if the site connection is secure|just a moment)\b/i.test(text);
+  return /\b(are you human|captcha|checking if the site connection is secure|checking your browser|just a moment|one more step|prove you are human|human verification|verify (?:that )?you are human|reviewing the security of your connection|cf-browser-verification|challenge-platform|challenges\.cloudflare\.com|turnstile|cf-chl|ray id)\b/i.test(text);
 }
 
 function isPsDealsHardBlockText(text: string): boolean {
@@ -235,7 +227,7 @@ async function waitForPsDealsAccess(
   url: string,
   options: Pick<PsDealsDiscoveryOptions, "debug" | "headless" | "humanCheckTimeoutMs">,
 ): Promise<void> {
-  const firstText = await page.locator("body").innerText({ timeout: 5_000 }).catch(() => "");
+  const firstText = await readPsDealsChallengeProbe(page);
   if (isPsDealsHardBlockText(firstText)) {
     throw new Error(`PSDeals blocked browser access at ${url}`);
   }
@@ -249,7 +241,7 @@ async function waitForPsDealsAccess(
   console.error(`PSDeals human check detected at ${url}. Solve it in the opened Chrome window; waiting up to ${Math.round(timeoutMs / 1000)} seconds.`);
   while (Date.now() < deadline) {
     await page.waitForTimeout(2_000);
-    const text = await page.locator("body").innerText({ timeout: 5_000 }).catch(() => "");
+    const text = await readPsDealsChallengeProbe(page);
     if (isPsDealsHardBlockText(text)) {
       throw new Error(`PSDeals blocked browser access at ${url}`);
     }
@@ -261,6 +253,75 @@ async function waitForPsDealsAccess(
   }
 
   throw new Error(`Timed out waiting for PSDeals human check at ${url}`);
+}
+
+async function waitForPsDealsListingLinks(
+  page: Page,
+  listingUrl: string,
+  includeAllCollectionLinks: boolean,
+  options: Pick<PsDealsDiscoveryOptions, "debug" | "headless" | "humanCheckTimeoutMs">,
+  pageNumber: number,
+): Promise<Array<{ url: string; name: string }>> {
+  let links = await extractPsDealsListingLinks(page, includeAllCollectionLinks);
+  if (links.length > 0) return links;
+
+  const firstProbe = await readPsDealsChallengeProbe(page);
+  if (isPsDealsHumanCheckText(firstProbe)) {
+    await waitForPsDealsAccess(page, listingUrl, options);
+    links = await extractPsDealsListingLinks(page, includeAllCollectionLinks);
+    if (links.length > 0) return links;
+  }
+
+  if (pageNumber > 1 && isClearlyExhaustedPsDealsPage(firstProbe)) return [];
+  if (options.headless) return links;
+
+  const timeoutMs = options.humanCheckTimeoutMs ?? 300_000;
+  const deadline = Date.now() + timeoutMs;
+  console.error(
+    `PSDeals exposed no candidate links at ${listingUrl}. If a human check is visible, solve it in Chrome; waiting up to ${Math.round(timeoutMs / 1000)} seconds.`,
+  );
+
+  while (Date.now() < deadline) {
+    await page.waitForTimeout(2_000);
+    const probe = await readPsDealsChallengeProbe(page);
+    if (isPsDealsHardBlockText(probe)) {
+      throw new Error(`PSDeals blocked browser access at ${listingUrl}`);
+    }
+    links = await extractPsDealsListingLinks(page, includeAllCollectionLinks);
+    if (links.length > 0) {
+      if (options.debug) console.error("PSDeals candidate links appeared; resuming discovery.");
+      return links;
+    }
+    if (pageNumber > 1 && isClearlyExhaustedPsDealsPage(probe)) return [];
+  }
+
+  throw new Error(`Timed out waiting for PSDeals candidate links at ${listingUrl}`);
+}
+
+async function extractPsDealsListingLinks(page: Page, includeAllCollectionLinks: boolean): Promise<Array<{ url: string; name: string }>> {
+  return page.evaluate((includeAll) =>
+    [...document.querySelectorAll<HTMLAnchorElement>('a[href*="/us-store/game/"]')]
+      .map((anchor) => ({
+        url: anchor.href,
+        name: anchor.textContent?.replace(/\s+/g, " ").trim() || anchor.getAttribute("aria-label") || anchor.href,
+      }))
+      .filter((link) => includeAll || /(?:^|[\s-])FREE(?:[\s-]|$)|\b0 USD\b/i.test(link.name)),
+    includeAllCollectionLinks,
+  );
+}
+
+async function readPsDealsChallengeProbe(page: Page): Promise<string> {
+  const [body, title, html, url] = await Promise.all([
+    page.locator("body").innerText({ timeout: 5_000 }).catch(() => ""),
+    page.title().catch(() => ""),
+    page.content().catch(() => ""),
+    Promise.resolve(page.url()),
+  ]);
+  return `${url}\n${title}\n${body}\n${html.slice(0, 50_000)}`;
+}
+
+function isClearlyExhaustedPsDealsPage(text: string): boolean {
+  return /\b(We found \d+ results|No results found|Nothing found)\b/i.test(text) && !isPsDealsHumanCheckText(text);
 }
 
 async function readPsDealsDiscoveryCache(path: string): Promise<PsDealsDiscoveryCache> {

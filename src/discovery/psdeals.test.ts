@@ -27,6 +27,9 @@ describe("PSDeals search URL selection", () => {
   it("recognizes human-check pages", () => {
     expect(isPsDealsHumanCheckText("Are you human? Complete the CAPTCHA to continue.")).toBe(true);
     expect(isPsDealsHumanCheckText("Checking if the site connection is secure")).toBe(true);
+    expect(isPsDealsHumanCheckText("Reviewing the security of your connection")).toBe(true);
+    expect(isPsDealsHumanCheckText('<script src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>')).toBe(true);
+    expect(isPsDealsHumanCheckText('<div id="cf-browser-verification" class="challenge-platform"></div>')).toBe(true);
     expect(isPsDealsHumanCheckText("We found 1800 results")).toBe(false);
   });
 });
