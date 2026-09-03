@@ -713,7 +713,6 @@ program
     const session = await openBrowserSession(app.userDataDir, options.headless);
     const cache = await readCache(app.cachePath);
     const pendingCartItems: PendingCartItem[] = [];
-    let keepBrowserOpen = false;
 
     try {
       await session.page.goto("https://store.playstation.com/en-us/pages/latest", { waitUntil: "domcontentloaded" });
@@ -936,17 +935,12 @@ program
         });
       }
       if (error instanceof PsDealsHumanCheckError && !options.headless) {
-        keepBrowserOpen = true;
-        console.error("Leaving the Chrome window open so you can inspect or solve the PSDeals verification page. Close it when finished.");
+        console.error("Closing the automation Chrome window. Refresh PSDeals with `npm run psdeals:unlock`, then rerun this command.");
       }
       throw error;
     } finally {
       await writeCache(app.cachePath, cache);
-      if (keepBrowserOpen) {
-        await session.releaseLock();
-      } else {
-        await session.close();
-      }
+      await session.close();
     }
   });
 

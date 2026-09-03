@@ -59,7 +59,7 @@ If PSDeals blocks automation, refresh the local PSDeals browser/cookie state:
 npm run psdeals:unlock
 ```
 
-Headed Chrome is recommended for PSDeals discovery because Cloudflare may block headless sessions. If PSDeals presents a human check in a headed run, ClaimStation leaves the Chrome window open for inspection instead of closing it immediately. If PSDeals says verification is temporarily unavailable, run `npm run psdeals:unlock`, solve PSDeals in that plain Chrome window, close it, then retry the redeem command. Adjust `PSDEALS_HUMAN_CHECK_TIMEOUT_MS` if you need more or less than the default five minutes, and adjust `PSDEALS_PAGE_DELAY_MS` if PSDeals starts challenging fast pagination.
+Headed Chrome is recommended for PSDeals discovery because Cloudflare may block headless sessions. If PSDeals presents a human check during an automated run, ClaimStation stops and closes the automation browser instead of asking you to solve the challenge in the CDP-controlled tab. Run `npm run psdeals:unlock`, solve PSDeals in that plain Chrome window, close it, then retry the redeem command. Adjust `PSDEALS_PAGE_DELAY_MS` if PSDeals starts challenging fast pagination.
 
 ## What It Does
 

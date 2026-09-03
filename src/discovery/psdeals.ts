@@ -264,13 +264,8 @@ async function waitForPsDealsAccess(
     );
   }
   if (!isPsDealsHumanCheckText(firstText)) return;
-  if (options.headless) {
-    throw new PsDealsHumanCheckError(`PSDeals human check is required at ${url}; rerun without --headless so it can be solved.`);
-  }
 
-  throw new PsDealsHumanCheckError(
-    `PSDeals human check is required at ${url}. Run \`npm run psdeals:unlock\`, solve PSDeals in the plain Chrome window, close it, then retry this command.`,
-  );
+  throw psDealsUnlockRequiredError(url, options.headless);
 }
 
 async function loadPsDealsListingLinksInBrowser(
@@ -288,35 +283,15 @@ async function loadPsDealsListingLinksInBrowser(
 
   const firstProbe = await readPsDealsChallengeProbe(page);
   if (isPsDealsHumanCheckText(firstProbe)) {
-    await waitForPsDealsAccess(page, listingUrl, options);
-    links = await extractPsDealsListingLinks(page, includeAllCollectionLinks);
-    if (links.length > 0) return links;
+    throw psDealsUnlockRequiredError(listingUrl, options.headless);
   }
 
   if (pageNumber > 1 && isClearlyExhaustedPsDealsPage(firstProbe)) return [];
   if (options.headless) return links;
 
-  const timeoutMs = options.humanCheckTimeoutMs ?? 300_000;
-  const deadline = Date.now() + timeoutMs;
-  console.error(
-    `PSDeals exposed no candidate links at ${listingUrl}. If a human check is visible, solve it in Chrome; waiting up to ${Math.round(timeoutMs / 1000)} seconds.`,
+  throw new PsDealsHumanCheckError(
+    `PSDeals exposed no candidate links at ${listingUrl}. Run \`npm run psdeals:unlock\`, solve PSDeals in the plain Chrome window, close it, then retry this command.`,
   );
-
-  while (Date.now() < deadline) {
-    await page.waitForTimeout(2_000);
-    const probe = await readPsDealsChallengeProbe(page);
-    if (isPsDealsHardBlockText(probe)) {
-      throw new Error(`PSDeals blocked browser access at ${listingUrl}`);
-    }
-    links = await extractPsDealsListingLinks(page, includeAllCollectionLinks);
-    if (links.length > 0) {
-      if (options.debug) console.error("PSDeals candidate links appeared; resuming discovery.");
-      return links;
-    }
-    if (pageNumber > 1 && isClearlyExhaustedPsDealsPage(probe)) return [];
-  }
-
-  throw new Error(`Timed out waiting for PSDeals candidate links at ${listingUrl}`);
 }
 
 async function fetchPsDealsListingLinks(
@@ -354,6 +329,15 @@ async function fetchPsDealsHtml(url: string, options: Pick<PsDealsDiscoveryOptio
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   if (isPsDealsHardBlockText(html) || isPsDealsHumanCheckText(stripHtml(html))) throw new Error("PSDeals returned a human-check or block page");
   return html;
+}
+
+function psDealsUnlockRequiredError(url: string, headless: boolean | undefined): PsDealsHumanCheckError {
+  if (headless) {
+    return new PsDealsHumanCheckError(`PSDeals human check is required at ${url}; rerun without --headless after refreshing PSDeals with \`npm run psdeals:unlock\`.`);
+  }
+  return new PsDealsHumanCheckError(
+    `PSDeals human check is required at ${url}. Run \`npm run psdeals:unlock\`, solve PSDeals in the plain Chrome window, close it, then retry this command.`,
+  );
 }
 
 function extractPsDealsLinksFromHtml(html: string, baseUrl: string, includeAllCollectionLinks: boolean): Array<{ url: string; name: string }> {

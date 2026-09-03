@@ -13,7 +13,6 @@ export type BrowserSession = {
   context: BrowserContext;
   page: Page;
   close: () => Promise<void>;
-  releaseLock: () => Promise<void>;
 };
 
 export type BrowserSessionOptions = {
@@ -97,7 +96,6 @@ export async function openBrowserSession(userDataDir: string, headless = false, 
       chromeProcess?.kill();
       await releaseLock();
     },
-    releaseLock,
   };
 }
 
